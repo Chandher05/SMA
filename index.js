@@ -6,11 +6,9 @@ const filepath = "./input.csv"
 Date.prototype.getWeek = function () {
   var date = new Date(this.getTime());
   date.setHours(0, 0, 0, 0);
-  // Thursday in current week decides the year.
   date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
-  // January 4 is always in week 1.
   var week1 = new Date(date.getFullYear(), 0, 4);
-  // Adjust to Thursday in week 1 and count number of weeks from date to week1.
+
   return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000
     - 3 + (week1.getDay() + 6) % 7) / 7);
 }
@@ -46,7 +44,7 @@ function groupedRecords(records) {
 }
 
 function isPeakHour(currentTime) {
-  //currentTimeforaCommute
+
   let peakHourForTheDay = peakHours[currentTime.getDay()] // 0,1,2,4
 
   let rowDate = new Date(currentTime)
@@ -57,24 +55,51 @@ function isPeakHour(currentTime) {
     peakStart.setHours(peakHourForTheDay[i].from[0], peakHourForTheDay[i].from[1], peakHourForTheDay[i].from[2]);
     let peakEnd = new Date(currentDate);
     peakEnd.setHours(peakHourForTheDay[i].to[0], peakHourForTheDay[i].to[1], peakHourForTheDay[i].to[2]);
-
-    // let ruleApplied = rules.find((rule) => commute.from == rule.from && commute.to == rule.to);
-    // console.log(foundIndex)
     if (currentTime >= peakStart && currentTime <= peakEnd) {
       return true;
     }
   }
   return false;
 
+}
 
+function calculateDailyScore(costRows) {
+  let dailyScores = {};
+  costRows.forEach(element => {
+    if (!dailyScores.hasOwnProperty(element.date)) {
+      dailyScores[element.date] = {};
+    }
+    if (!dailyScores[element.date].hasOwnProperty(`${element.from}-${element.to}`)) {
+      dailyScores[element.date][`${element.from}-${element.to}`] = 0;
+    }
+    dailyScores[element.date][`${element.from}-${element.to}`] = Math.min(dailyScores[element.date][`${element.from}-${element.to}`] + element.cost, element.dailyCap)
+  });
+  return dailyScores;
+}
+
+function calculateWeeklyScores(dailyScores) {
+  const weeklyScores = {};
+  const keys = Object.keys(dailyScores);
+  for (const key of keys) {
+    let weekNo = new Date(key).getWeek();
+    if (!weeklyScores.hasOwnProperty(weekNo)) {
+      weeklyScores[weekNo] = {};
+    }
+    Object.entries(dailyScores[key]).forEach(([route, value]) => {
+      let rule = rules.find((rule) => `${rule.from}-${rule.to}` === route);
+      if (!weeklyScores[weekNo].hasOwnProperty(route)) {
+        weeklyScores[weekNo][route] = 0;
+      }
+      weeklyScores[weekNo][route] = Math.min(weeklyScores[weekNo][route] + value, rule.weeklyCap);
+    });
+  }
+  return weeklyScores
 }
 
 
 
 function calculateScore(rows) {
-  // let data = groupedRecords(rows);
 
-  const result = {};
   let costRows = rows.map((row) => {
     let { peak, nonPeak, dailyCap, weeklyCap } = rules.find((rule) => row.from == rule.from && row.to == rule.to);
     if (isPeakHour(row.dateTime)) {
@@ -83,42 +108,15 @@ function calculateScore(rows) {
     return { ...row, cost: nonPeak, dailyCap, weeklyCap }
   })
 
-  costRows.forEach(element => {
-    // let weekNo = `${element.dateTime.getFullYear()}/${element.dateTime.getWeek()}`;
-    // if (!result.hasOwnProperty(weekNo)) {
-    //   result = {};
-    // }
-    if (!result.hasOwnProperty(element.date)) {
-      result[element.date] = {};
-    }
-    if (!result[element.date].hasOwnProperty(`${element.from}-${element.to}`)) {
-      result[element.date][`${element.from}-${element.to}`] = 0;
+  let dailyScores = calculateDailyScore(costRows);
 
-    }
-    result[element.date][`${element.from}-${element.to}`] = Math.min(result[element.date][`${element.from}-${element.to}`] + element.cost, element.dailyCap)
-  });
+  let weeklyScores = calculateWeeklyScores(dailyScores);
 
 
-  const finalResult = {};
-  const keys = Object.keys(result);
-  for (const key of keys) {
-    let weekNo = new Date(key).getWeek();
-    if (!finalResult.hasOwnProperty(weekNo)) {
-      finalResult[weekNo] = {};
-    }
-    Object.entries(result[key]).forEach(([route, value]) => {
-      let rule = rules.find((rule) => `${rule.from}-${rule.to}` === route);
-      if (!finalResult[weekNo].hasOwnProperty(route)) {
-        finalResult[weekNo][route] = 0;
-      }
-      finalResult[weekNo][route] = Math.min(finalResult[weekNo][route] + value, rule.weeklyCap);
-    });
-  }
-  const sum = Object.values(finalResult).reduce((acc, cur) => acc + Object.values(cur).reduce((a, b) => a + b), 0);
-
-  console.log(finalResult)
+  const sum = Object.values(weeklyScores).reduce((acc, cur) => acc + Object.values(cur).reduce((a, b) => a + b), 0);
   return sum;
 }
+
 
 
 let data = [];
