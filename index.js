@@ -134,7 +134,7 @@ fs.createReadStream(filepath)
   })
 
   .on('end', () => {
-    console.log(calculateScore(data));
+    console.log("The total cost is - ", calculateScore(data));
   })
 
 
